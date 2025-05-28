@@ -1,0 +1,102 @@
+Inversor e Measures
+
+* Asterisco e a primeira linha do arquivo indica um COMENTARIO
+
+** Modelo dos transistores
+.include ptm45nmhp.l
+
+*L = 50n
+*Wmin = 100n
+*Lambda = 1.5 (Proporção PMOS/NMOS)
+
+** Criar variaveis
+* .param nome = valor
+
+.param Ltran = 50n
+.param Wnmos = 100n
+.param Wpmos = Wnmos * 2.17
+.param VDD = 1V
+
+** Fonte de alimentação VDD
+** Vnome nó+ nó- valor
+VDD VDD 0 {VDD}
+
+** Fonte de entrada do tipo PULSE
+*  Vnome nó+ nó- PULSE(Vlow Vhigh tempo_de_comeco inclinacao_subida inclinacao_low largura_pulso periodo)
+VinA A 0 PULSE(0v {VDD} 0ns 0.05ns 0.05ns 2ns 4.2ns)
+*VinB B 0 PULSE(0v {VDD} 0ns 0.05ns 0.05ns 1ns 2.1ns)
+
+** Criar sub-circuito
+* .suckt nome_do_circuito in1 in2 ... out VDD GND
+
+** Criar a rede de transistores
+* Mnome nó_dreno nó_gate nó_fonte nó_bulk tipo W= L=
+
+* .ends nome_do_circuito
+
+.subckt inversor a out VDD GND
+M1P VDD a out VDD PMOS L={Ltran} W={Wpmos}
+M1N GND a out GND NMOS L={Ltran} W={Wnmos}
+.ends inversor
+
+
+* Instancia de um sub-circuito
+**Xnome parametro1 parametro2 parametro3 ... nome_do_subckt
+
+xinversor 	a 		out_inv 	VDD GND inversor
+
+xinversor0 	out_inv 		out_buffer 	VDD GND inversor
+xinversor1 	out_inv 		out_buffer 	VDD GND inversor
+xinversor2 	out_inv 		out_buffer 	VDD GND inversor
+xinversor3 	out_inv 		out_buffer 	VDD GND inversor
+
+* CAPACITOR DE SAIDA (CARGA DE SAIDA)
+** Cnome  nó+ nó- valor
+**C1 out_buffer 0 1ff
+
+
+** Simulação transiente (Tipo de simulação)
+** .tran passo tempo_total
+.tran 0.1ps 4.3ns
+
+
+** Medida de atraso de propagação
+* .measure tran nome_da_medida
+* + trig v(no_de_entrada) 	val = VDD/2 rise/fall = numero
+* + targ v(no_de_saida)		val = VDD/2 rise/fall = numero
+.measure tran atraso_propagacao_hl
++ trig v(a) 			val={VDD*0.5} fall = 1
++ targ v(out_buffer) 	val={VDD*0.5} fall = 1
+
+** Para escolher onde medir no tempo usar duas opções
+** Contar qual ocorrência  de rise/fall (não recomendado)
+** Utilizar o argumento td (time delay)
+** Neste exemplo para medir o atraso de subida no instante de tempo 4ns
+** Basta colocar td = 2ns(qualquer instante de tempo), pegando o primeiro rise depois de 2ns
+.measure tran atraso_propagacao_lh
++ trig v(a) 			val={VDD*0.5} td = 2ns rise = 1
++ targ v(out_buffer) 	val={VDD*0.5} td = 2ns rise = 1
+
+** Medida de atraso de transição
+* .measure tran nome_da_medida (HL e LH inverte o trigger e target)
+* + trig v(no_de_saida) 	val = {VDD*0.8} fall = numero
+* + targ v(no_de_saida)		val = {VDD*0.2} fall = numero
+.measure tran atraso_transicao_hl
++ trig v(out_buffer) 	val={VDD*0.8} fall = 1
++ targ v(out_buffer) 	val={VDD*0.2} fall = 1
+
+.measure tran atraso_transicao_lh
++ trig v(out_buffer) 	val={VDD*0.2} rise = 1
++ targ v(out_buffer) 	val={VDD*0.8} rise = 1
+
+
+.measure tran TDHL
++ trig v(a) 			val={VDD*0.5} fall = 1
++ targ v(out_inv)     	val={VDD*0.5} rise = 1
+
+.measure tran TDLH
++ trig v(a) 		val={VDD*0.5} rise = 1 td = 2ns
++ targ v(out_inv)            	val={VDD*0.5} fall = 1 td = 2ns
+
+** Fim da descricao
+.end
