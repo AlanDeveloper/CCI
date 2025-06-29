@@ -1,0 +1,131 @@
+Nome do Aluno: Alan Santos
+
+.include ptm45nmhp.l
+
+* Definição dos parâmetros globais
+.param L_T = 50n  ; Comprimento do Transistor
+.param W_N = 100n ; Largura do NMOS
+.param W_P = W_N * 1.5 ; Largura do PMOS
+.param VDD = 1V   ; Tensão de Alimentação
+
+* Fonte de alimentação VDD
+V_VDD VDD 0 DC {VDD}
+
+* Fonte de entrada
+V_IN_A IN_A 0 PWL(0n 0 1n {VDD} 2n 0 3n {VDD} 4n 0 5n {VDD} 6n 0 7n {VDD} 8n 0 9n {VDD} 10n 0)
+V_IN_B IN_B 0 PWL(0n 0 2n {VDD} 4n 0 6n {VDD} 8n 0 10n {VDD})
+V_IN_C IN_C 0 PWL(0n 0 4n {VDD} 8n 0)
+V_IN_D IN_D 0 PWL(0n 0 5n {VDD} 10n 0)
+
+* Subcircuito do inversor
+.subckt INVERTER IN_node OUT_node VDD 0
+M_P OUT_node IN_node VDD VDD PMOS L={L_T} W={W_P}
+M_N OUT_node IN_node 0 0 NMOS L={L_T} W={W_N}
+.ends INVERTER
+
+* Subcircuito do fanout4
+.subckt FANOUT4 IN_node OUT_node VDD 0
+X_F1 IN_node OUT_node VDD 0 INVERTER
+X_F2 IN_node OUT_node VDD 0 INVERTER
+X_F3 IN_node OUT_node VDD 0 INVERTER
+X_F4 IN_node OUT_node VDD 0 INVERTER
+.ends FANOUT4
+
+* Subcircuito para AND
+.subckt AND IN_NODE_A IN_NODE_B OUT_node VDD 0
+M1 n1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P} ; PMOS em paralelo
+M2 n1 IN_NODE_B VDD VDD PMOS L={L_T} W={W_P}
+
+M3 n1 IN_NODE_A net_mid 0 NMOS L={L_T} W={W_N} ; NMOS em série
+M4 net_mid IN_NODE_B 0 0 NMOS L={L_T} W={W_N}
+
+X_INV n1 OUT_node VDD 0 INVERTER ; NAND -> AND
+.ends AND
+
+.subckt OR IN_NODE_A IN_NODE_B OUT_NODE VDD 0
+M1 net1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P} ; PMOS em série
+M2 OUT IN_NODE_B net1 VDD PMOS L={L_T} W={W_P}
+
+M3 OUT IN_NODE_A 0 0 NMOS L={L_T} W={W_N} ; NMOS em paralelo
+M4 OUT IN_NODE_B 0 0 NMOS L={L_T} W={W_N}
+
+X_INV OUT OUT_NODE VDD 0 INVERTER ; NOR -> OR
+.ends OR
+
+* Subcircuito do F1 = !(!(a * d)+!(b * c))
+.subckt F1 IN_A IN_B IN_C IN_D OUT_node VDD 0
+X_A_AND_D IN_A IN_D X_OUT_A_AND_D VDD 0 AND ; F = A * D
+X_INV_1 X_OUT_A_AND_D X_OUT_INV_1 VDD 0 INVERTER ; G = !F
+
+X_B_AND_C IN_B IN_C X_OUT_B_AND_C VDD 0 AND ; H = B * C
+X_INV_2 X_OUT_B_AND_C X_OUT_INV_2 VDD 0 INVERTER ; I = !G
+
+X_OR X_OUT_INV_1 X_OUT_INV_2 X_OUT_OR VDD 0 OR ; G + I = J
+X_INV X_OUT_OR OUT_node VDD 0 INVERTER ; K = !O
+.ends F1
+
+* Subcircuito do F2 = ((!a * !b * !c) + (!a * b * c) + (a * !b * c) + (a * b * !c))
+.subckt F2 IN_A IN_B IN_C OUT_node VDD 0
+X_INV_A IN_A X_OUT_INV_A VDD 0 INVERTER ; !A
+X_INV_B IN_B X_OUT_INV_B VDD 0 INVERTER ; !B
+X_INV_C IN_C X_OUT_INV_C VDD 0 INVERTER ; !C
+
+X_AND_AB_1 X_OUT_INV_A X_OUT_INV_B X_OUT_AND_AB_1 VDD 0 AND ; !A * !B
+X_AND_AB_2 IN_A X_OUT_INV_B X_OUT_AND_AB_2 VDD 0 AND ; A * !B
+X_AND_AB_3 X_OUT_INV_A IN_B X_OUT_AND_AB_3 VDD 0 AND ; !A * B
+X_AND_AB_4 IN_A IN_B X_OUT_AND_AB_4 VDD 0 AND ; A * B
+
+X_AND_ABC_1 X_OUT_AND_AB_1 X_OUT_INV_C X_OUT_AND_ABC_1 VDD 0 AND ; !A * !B * !C
+X_AND_ABC_2 X_OUT_AND_AB_2 IN_C X_OUT_AND_ABC_2 VDD 0 AND ; A * !B * C
+X_AND_ABC_3 X_OUT_AND_AB_3 IN_C X_OUT_AND_ABC_3 VDD 0 AND ; !A * B * C
+X_AND_ABC_4 X_OUT_AND_AB_4 X_OUT_INV_C X_OUT_AND_ABC_4 VDD 0 AND ; A * B * !C
+
+X_OR_1 X_OUT_AND_ABC_1 X_OUT_AND_ABC_2 X_OUT_OR_1 VDD 0 OR
+X_OR_2 X_OUT_AND_ABC_3 X_OUT_AND_ABC_4 X_OUT_OR_2 VDD 0 OR
+X_OR_3 X_OUT_OR_1 X_OUT_OR_2 OUT_node VDD 0 OR
+.ends F2
+
+* Declarar inversores A
+X_INV_A1 IN_A X_INV_A1_OUT VDD 0 INVERTER
+X_INV_A2 X_INV_A1_OUT X_INV_A2_OUT VDD 0 INVERTER ; Buffer sinal A
+
+* Declarar inversores B
+X_INV_B1 IN_B X_INV_B1_OUT VDD 0 INVERTER
+X_INV_B2 X_INV_B1_OUT X_INV_B2_OUT VDD 0 INVERTER ; Buffer sinal B
+
+* Declarar inversores C
+X_INV_C1 IN_C X_INV_C1_OUT VDD 0 INVERTER
+X_INV_C2 X_INV_C1_OUT X_INV_C2_OUT VDD 0 INVERTER ; Buffer sinal C
+
+* Declarar inversores D
+X_INV_D1 IN_D X_INV_D1_OUT VDD 0 INVERTER
+X_INV_D2 X_INV_D1_OUT X_INV_D2_OUT VDD 0 INVERTER ; Buffer sinal D
+
+* Declarar F1 = !(!(a * d)+!(b * c))
+X_F1 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_INV_D2_OUT X_F1_OUT VDD 0 F1
+
+* Declarar F2 = ((!a * !b * !c) + (!a * b * c) + (a * !b * c) + (a * b * !c))
+X_F2 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_F2_OUT VDD 0 F2
+
+* Declarar F2 = ((!a * !b * !c) + (!a * b * c) + (a * !b * c) + (a * b * !c))
+X_F3 X_F1_OUT X_F2_OUT X_F3_OUT VDD 0 OR
+
+* Declarar o fanout4
+X_FANOUT X_F3_OUT X_FANOUT_OUT VDD 0 FANOUT4
+
+* Declarar testes dos circuitos
+*X_TEST_INV_A IN_A X_TEST_INV_A_OUT VDD 0 INVERTER
+*X_TEST_INV_B X_TEST_INV_A_OUT X_TEST_INV_B_OUT VDD 0 INVERTER ; Buffer sinal B
+
+*X_TEST_INV_C IN_C X_TEST_INV_C_OUT VDD 0 INVERTER
+*X_TEST_INV_D X_TEST_INV_C_OUT X_TEST_INV_D_OUT VDD 0 INVERTER ; Buffer sinal D
+
+*X_TEST_AND_BD X_TEST_INV_B_OUT X_TEST_INV_D_OUT X_TEST_AND_BD_OUT VDD 0 AND ; B * D
+*X_TEST_OR_BD X_TEST_INV_B_OUT X_TEST_INV_D_OUT X_TEST_OR_BD_OUT VDD 0 OR ; B + D
+
+*X_TEST_FANOUT4_B X_TEST_INV_B_OUT X_TEST_FANOUT4_B_OUT VDD 0 FANOUT4 ; !B
+
+* Simulação transiente
+.tran 0.1n 10n
+
+.end
