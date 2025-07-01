@@ -10,12 +10,15 @@ Nome do Aluno: Alan Santos
 
 * Fonte de alimentação VDD
 V_VDD VDD 0 DC {VDD}
+V_VDD2 VDD2 0 DC {VDD}
 
-* Fonte de entrada
-V_IN_A IN_A 0 PWL(0n 0 1n {VDD} 2n 0 3n {VDD} 4n 0 5n {VDD} 6n 0 7n {VDD} 8n 0 9n {VDD} 10n 0)
-V_IN_B IN_B 0 PWL(0n 0 2n {VDD} 4n 0 6n {VDD} 8n 0 10n {VDD})
-V_IN_C IN_C 0 PWL(0n 0 4n {VDD} 8n 0)
-V_IN_D IN_D 0 PWL(0n 0 5n {VDD} 10n 0)
+* FONTES DE ENTRADA
+* A000, 1B00, A100, 01C0, A110, 1B10, A010
+
+V_IN_A IN_A 0 PWL(0n 0 2n {VDD} 4n 0 6n {VDD} 8n 0 10n {VDD} 12n 0 14n {VDD} 16n 0 18n {VDD} 20n 0 22n {VDD} 24n 0 26n {VDD} 28n 0 30n {VDD})
+V_IN_B IN_B 0 PWL(0n 0 4n 0 8n {VDD} 12n {VDD} 16n 0 20n 0 24n {VDD} 28n {VDD})
+V_IN_C IN_C 0 PWL(0n 0 8n 0 16n {VDD} 24n {VDD})
+V_IN_D IN_D 0 PWL(0n 0 16n 0 32n {VDD})
 
 * Subcircuito do inversor
 .subckt INVERTER IN_node OUT_node VDD 0
@@ -33,24 +36,31 @@ X_F4 IN_node OUT_node VDD 0 INVERTER
 
 * Subcircuito para AND
 .subckt AND IN_NODE_A IN_NODE_B OUT_node VDD 0
-M1 n1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P} ; PMOS em paralelo
-M2 n1 IN_NODE_B VDD VDD PMOS L={L_T} W={W_P}
+M1 n1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P * 2.4} ; PMOS em paralelo
+M2 n1 IN_NODE_B VDD VDD PMOS L={L_T} W={W_P * 2.4}
 
-M3 n1 IN_NODE_A net_mid 0 NMOS L={L_T} W={W_N} ; NMOS em série
-M4 net_mid IN_NODE_B 0 0 NMOS L={L_T} W={W_N}
+M3 n1 IN_NODE_A net_mid 0 NMOS L={L_T} W={W_N * 2} ; NMOS em série
+M4 net_mid IN_NODE_B 0 0 NMOS L={L_T} W={W_N * 2}
 
 X_INV n1 OUT_node VDD 0 INVERTER ; NAND -> AND
 .ends AND
 
+* Subcircuito para OR
 .subckt OR IN_NODE_A IN_NODE_B OUT_NODE VDD 0
-M1 net1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P} ; PMOS em série
-M2 OUT IN_NODE_B net1 VDD PMOS L={L_T} W={W_P}
+M1 net1 IN_NODE_A VDD VDD PMOS L={L_T} W={W_P * 2.4} ; PMOS em série
+M2 OUT IN_NODE_B net1 VDD PMOS L={L_T} W={W_P * 2.4}
 
 M3 OUT IN_NODE_A 0 0 NMOS L={L_T} W={W_N} ; NMOS em paralelo
 M4 OUT IN_NODE_B 0 0 NMOS L={L_T} W={W_N}
 
 X_INV OUT OUT_NODE VDD 0 INVERTER ; NOR -> OR
 .ends OR
+
+* Subcircuito para BUFFER
+.subckt BUFFER IN OUT VDD 0
+X_INV_1 IN X_IN_INV_OUT VDD 0 INVERTER
+X_INV_2 X_IN_INV_OUT OUT VDD 0 INVERTER
+.ends BUFFER
 
 * Subcircuito do F1 = !(!(a * d)+!(b * c))
 .subckt F1 IN_A IN_B IN_C IN_D OUT_node VDD 0
@@ -85,30 +95,25 @@ X_OR_2 X_OUT_AND_ABC_3 X_OUT_AND_ABC_4 X_OUT_OR_2 VDD 0 OR
 X_OR_3 X_OUT_OR_1 X_OUT_OR_2 OUT_node VDD 0 OR
 .ends F2
 
-* Declarar inversores A
-X_INV_A1 IN_A X_INV_A1_OUT VDD 0 INVERTER
-X_INV_A2 X_INV_A1_OUT X_INV_A2_OUT VDD 0 INVERTER ; Buffer sinal A
+* Subcircuito do F3 = F1 + F2
+.subckt F3 IN_F1 IN_F2 OUT_node VDD 0
+X_OR IN_F1 IN_F2 OUT_node VDD 0 OR
+.ends F3
 
-* Declarar inversores B
-X_INV_B1 IN_B X_INV_B1_OUT VDD 0 INVERTER
-X_INV_B2 X_INV_B1_OUT X_INV_B2_OUT VDD 0 INVERTER ; Buffer sinal B
-
-* Declarar inversores C
-X_INV_C1 IN_C X_INV_C1_OUT VDD 0 INVERTER
-X_INV_C2 X_INV_C1_OUT X_INV_C2_OUT VDD 0 INVERTER ; Buffer sinal C
-
-* Declarar inversores D
-X_INV_D1 IN_D X_INV_D1_OUT VDD 0 INVERTER
-X_INV_D2 X_INV_D1_OUT X_INV_D2_OUT VDD 0 INVERTER ; Buffer sinal D
+* Declarar buffers A, B, C, D
+X_INV_A2 IN_A X_INV_A2_OUT VDD 0 BUFFER
+X_INV_B2 IN_B X_INV_B2_OUT VDD 0 BUFFER
+X_INV_C2 IN_C X_INV_C2_OUT VDD 0 BUFFER
+X_INV_D2 IN_D X_INV_D2_OUT VDD 0 BUFFER
 
 * Declarar F1 = !(!(a * d)+!(b * c))
-X_F1 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_INV_D2_OUT X_F1_OUT VDD 0 F1
+X_F1 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_INV_D2_OUT X_F1_OUT VDD2 0 F1
 
 * Declarar F2 = ((!a * !b * !c) + (!a * b * c) + (a * !b * c) + (a * b * !c))
-X_F2 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_F2_OUT VDD 0 F2
+X_F2 X_INV_A2_OUT X_INV_B2_OUT X_INV_C2_OUT X_F2_OUT VDD2 0 F2
 
-* Declarar F2 = ((!a * !b * !c) + (!a * b * c) + (a * !b * c) + (a * b * !c))
-X_F3 X_F1_OUT X_F2_OUT X_F3_OUT VDD 0 OR
+* Declarar F3 = F1 + F2
+X_F3 X_F1_OUT X_F2_OUT X_F3_OUT VDD2 0 F3
 
 * Declarar o fanout4
 X_FANOUT X_F3_OUT X_FANOUT_OUT VDD 0 FANOUT4
@@ -126,6 +131,137 @@ X_FANOUT X_F3_OUT X_FANOUT_OUT VDD 0 FANOUT4
 *X_TEST_FANOUT4_B X_TEST_INV_B_OUT X_TEST_FANOUT4_B_OUT VDD 0 FANOUT4 ; !B
 
 * Simulação transiente
-.tran 0.1n 10n
+.tran 0.1n 32n
+
+* Medidas do circuito F1
+*X_MEA_F1_A X_INV_A2_OUT VDD VDD VDD X_MEA_F1_A_OUT VDD 0 F1
+
+*.measure tran F1_DELAY_A111LH ; 0111 -> 1111
+*+ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F1_A_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F1_DELAY_A111HL ; 1111 -> 0111
+*+ trig v(X_INV_A2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F1_A_OUT) val={VDD}/2 fall = 1
+
+*X_MEA_F1_B VDD X_INV_B2_OUT VDD VDD X_MEA_F1_B_OUT VDD 0 F1
+
+*.measure tran F1_DELAY_1B11LH ; 1011 -> 1111
+*+ trig v(X_INV_B2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F1_B_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F1_DELAY_1B11HL ; 1111 -> 1011
+*+ trig v(X_INV_B2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F1_B_OUT) val={VDD}/2 fall = 1
+
+*X_MEA_F1_C VDD VDD X_INV_C2_OUT VDD X_MEA_F1_C_OUT VDD 0 F1
+*.measure tran F1_DELAY_11C1LH ; 1101 -> 1111
+*+ trig v(X_INV_C2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F1_C_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F1_DELAY_11C1HL ; 1111 -> 1101
+*+ trig v(X_INV_C2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F1_C_OUT) val={VDD}/2 fall = 1
+
+*X_MEA_F1_D VDD VDD VDD X_INV_D2_OUT X_MEA_F1_D_OUT VDD 0 F1
+
+*.measure tran F1_DELAY_111DLH ; 1110 -> 1111
+*+ trig v(X_INV_D2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F1_D_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F1_DELAY_111DHL ; 1111 -> 1110
+*+ trig v(X_INV_D2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F1_D_OUT) val={VDD}/2 fall = 1
+
+* Medidas do circuito F2
+
+*X_MEA_F2_A X_INV_A2_OUT 0 VDD X_MEA_F2_A_OUT VDD 0 F2
+
+*.measure tran F2_DELAY_A01LH ; 001 -> 101
+*+ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F2_A_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F2_DELAY_A01HL ; 101 -> 001
+*+ trig v(X_INV_A2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F2_A_OUT) val={VDD}/2 fall = 1
+
+*X_MEA_F2_B 0 X_INV_B2_OUT VDD X_MEA_F2_B_OUT VDD 0 F2
+
+*.measure tran F2_DELAY_0B1LH ; 001 -> 011
+*+ trig v(X_INV_B2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F2_B_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F2_DELAY_0B1HL ; 011 -> 001
+*+ trig v(X_INV_B2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F2_B_OUT) val={VDD}/2 fall = 1
+
+*X_MEA_F2_C 0 VDD X_INV_C2_OUT X_MEA_F2_C_OUT VDD 0 F2
+
+*.measure tran F2_DELAY_01CLH ; 010 -> 011
+*+ trig v(X_INV_C2_OUT) val={VDD}/2 rise = 1
+*+ targ v(X_MEA_F2_C_OUT) val={VDD}/2 rise = 1
+
+*.measure tran F2_DELAY_01CHL ; 011 -> 010
+*+ trig v(X_INV_C2_OUT) val={VDD}/2 fall = 1
+*+ targ v(X_MEA_F2_C_OUT) val={VDD}/2 fall = 1
+
+* Medidas do circuito completo
+
+.measure tran DELAY_A000HL
++ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1 td=0n
++ targ v(X_F3_OUT) val={VDD}/2 fall = 1 td=0n
+
+.measure tran DELAY_A000LH
++ trig v(X_INV_A2_OUT) val={VDD}/2 fall = 1 td=2n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=2n
+
+.measure tran DELAY_1B00LH
++ trig v(X_INV_B2_OUT) val={VDD}/2 rise = 1 td=5.5n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=5.5n
+
+.measure tran DELAY_A100HL
++ trig v(X_INV_A2_OUT) val={VDD}/2 fall = 1 td=6.5n
++ targ v(X_F3_OUT) val={VDD}/2 fall = 1 td=6.5n
+
+.measure tran DELAY_A100LH
++ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1 td=8.5n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=8.5n
+
+.measure tran DELAY_01C0LH
++ trig v(X_INV_C2_OUT) val={VDD}/2 rise = 1 td=11.4n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=11.4n
+
+.measure tran DELAY_A110HL
++ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1 td=12.6n
++ targ v(X_F3_OUT) val={VDD}/2 fall = 1 td=12.6n
+
+.measure tran DELAY_1B10LH
++ trig v(X_INV_B2_OUT) val={VDD}/2 fall = 1 td=13.8n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=13.8n
+
+.measure tran DELAY_A010HL
++ trig v(X_INV_A2_OUT) val={VDD}/2 fall = 1 td=15n
++ targ v(X_F3_OUT) val={VDD}/2 fall = 1 td=15n
+
+.measure tran DELAY_A010LH
++ trig v(X_INV_A2_OUT) val={VDD}/2 rise = 1 td=16.5n
++ targ v(X_F3_OUT) val={VDD}/2 rise = 1 td=16.5n
+
+.measure tran DELAY_1B10HL
++ trig v(X_INV_B2_OUT) val={VDD}/2 rise = 1 td=21.5n
++ targ v(X_F3_OUT) val={VDD}/2 fall = 1 td=21.5n
+
+* Medidas de consumo
+
+.measure tran AVERAGE_CURRENT AVG(i(V_VDD2)*-v(VDD2)) from=0ns to=32ns
+
+.measure tran STATIC_CURRENT_1000 AVG(i(V_VDD2)*-v(VDD2)) from=0ns to=2ns
+.measure tran STATIC_CURRENT_0000 AVG(i(V_VDD2)*-v(VDD2)) from=2ns to=4ns
+.measure tran STATIC_CURRENT_1100 AVG(i(V_VDD2)*-v(VDD2)) from=5.6ns to=6.5ns
+.measure tran STATIC_CURRENT_0100 AVG(i(V_VDD2)*-v(VDD2)) from=6.5ns to=7.5ns
+.measure tran STATIC_CURRENT_0110 AVG(i(V_VDD2)*-v(VDD2)) from=11.6ns to=12.6ns
+.measure tran STATIC_CURRENT_1110 AVG(i(V_VDD2)*-v(VDD2)) from=12.6ns to=13.6ns
+.measure tran STATIC_CURRENT_1010 AVG(i(V_VDD2)*-v(VDD2)) from=13.6ns to=14.6ns
+.measure tran STATIC_CURRENT_0010 AVG(i(V_VDD2)*-v(VDD2)) from=14.6ns to=15.6ns
 
 .end
